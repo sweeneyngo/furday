@@ -69,6 +69,8 @@ def search():
         text = ''
         status = to_json(tweet)
 
+        print(f'Tweet: {status['id']}')
+
         # check DB if tweet already sent by bot
         res = query(cur, '''
         SELECT * FROM store
@@ -76,7 +78,7 @@ def search():
         (SELECT 1 FROM store WHERE tweet=%s)''', (status['id'],))
         
         print(f"Does it exist in DB? {res}")
-        
+
         # don't sift through older tweets
         if res != None:
             break

@@ -52,14 +52,6 @@ class Admin(commands.Cog):
             )
 
         await ctx.send("Successfully reloaded all extensions")
-
-    @commands.command()
-    @commands.check(permissions.is_owner)
-    async def reboot(self, ctx):
-        """ Reboot the bot """
-        await ctx.send("Rebooting now...")
-        time.sleep(1)
-        sys.exit(0)
-
+        
 def setup(bot):
     bot.add_cog(Admin(bot))

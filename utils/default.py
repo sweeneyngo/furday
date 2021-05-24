@@ -4,18 +4,24 @@ import json
 import discord
 import traceback
 import timeago as timesince
-from datetime import datetime, timezone
 import tweepy
+import psycopg2
+
+from datetime import datetime, timezone
 from dotenv import load_dotenv, find_dotenv
 
 from io import BytesIO
 
 load_dotenv(find_dotenv())
-
 ACCESS_SECRET = os.environ.get("ACCESS_SECRET")
 ACCESS_TOKEN = os.environ.get("ACCESS_TOKEN")
 CONSUMER_KEY = os.environ.get("CONSUMER_KEY")
 CONSUMER_SECRET = os.environ.get("CONSUMER_SECRET")
+DATABASE_USER = os.environ.get("DATABASE_USER")
+DATABASE_PASS = os.environ.get("DATABASE_PASS")
+DATABASE_HOST = os.environ.get("DATABASE_HOST")
+DATABASE_PORT = os.environ.get("DATABASE_PORT")
+DATABASE_DATABASE = os.environ.get("DATABASE_DATABASE")
 
 def config(filename: str = "config"):
     """ Fetch default config file """
@@ -43,12 +49,35 @@ def api():
 def search():
     _api = api()
     key = config()
+
+    conn = psycopg2.connect(user = DATABASE_USER, 
+                        password = DATABASE_PASS,
+                        host = DATABASE_HOST,
+                        port = DATABASE_PORT,
+                        database = DATABASE_DATABASE)
+                     
+    cur = conn.cursor()
+
+    cur.execute('''
+    CREATE TABLE IF NOT EXISTS store (id SERIAL PRIMARY KEY,
+    tweet BIGINT NOT NULL UNIQUE)''')
+
     tweets = _api.user_timeline(key['twitter_id'], count=5)
     
     for tweet in tweets:
 
         text = ''
         status = to_json(tweet)
+
+        # check DB if tweet already sent by bot
+        res = query(cur, '''
+        SELECT * FROM store
+        WHERE EXISTS
+        (SELECT 1 FROM store WHERE tweet=%s)''', (status['id'],))
+        
+        # don't sift through older tweets
+        if res != None:
+            break
 
         if 'text' in status:
             text = status['text']
@@ -59,6 +88,20 @@ def search():
 
         # Original tweet
         elif "Today's furry character" in text:
+            
+            # store id in DB
+            cur = conn.cursor()
+            
+            res = cur.execute('''
+            INSERT INTO store (tweet)
+            VALUES (%s)''', (status['id'],))
+
+            # print current table
+            print(query(cur, '''
+            SELECT * FROM store'''))
+
+            cur.connection.close()
+
             return image(tweet)
 
 def image(src):
@@ -100,3 +143,9 @@ def send_embed(color, user, res, img, profile, time):
 
 def to_json(obj):
     return json.loads(json.dumps(obj))
+
+def query(cur, query, args=()):
+
+    cur.execute(query, args)
+    r = [dict((cur.description[i][0], value) for i, value in enumerate(row)) for row in cur.fetchall()]
+    return (r[0] if r else None)

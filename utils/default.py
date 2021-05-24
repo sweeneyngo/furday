@@ -69,7 +69,7 @@ def search():
         text = ''
         status = to_json(tweet)
 
-        print(f'Tweet: {status['id']}')
+        print(f"Tweet: {status['id']}")
 
         # check DB if tweet already sent by bot
         res = query(cur, '''

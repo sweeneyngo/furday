@@ -75,6 +75,8 @@ def search():
         WHERE EXISTS
         (SELECT 1 FROM store WHERE tweet=%s)''', (status['id'],))
         
+        print(f"Does it exist in DB? {res}")
+        
         # don't sift through older tweets
         if res != None:
             break

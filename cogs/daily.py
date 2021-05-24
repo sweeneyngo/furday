@@ -28,7 +28,10 @@ class Daily(commands.Cog):
             return
 
         channel = self.bot.get_channel(self.channel)
-        res, img, profile, time = default.search()
+        
+        res = default.search()
+        if res != None:
+            res, img, profile, time = res
         
 
         user = self.bot.get_user(self.config['id'])
@@ -64,7 +67,9 @@ class Daily(commands.Cog):
         """ Retrieve a daily furry. """
         await ctx.message.delete()
 
-        res, img, profile, time = default.search()
+        res = default.search()
+        if res != None:
+            res, img, profile, time = res
         
         embedColour = random.randint(0, self.config['white'])
 

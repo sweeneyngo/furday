@@ -5,9 +5,16 @@ import traceback
 import timeago as timesince
 from datetime import datetime, timezone
 import tweepy
+from dotenv import load_dotenv, find_dotenv
 
 from io import BytesIO
 
+load_dotenv(find_dotenv())
+
+ACCESS_SECRET = os.environ.get("ACCESS_SECRET")
+ACCESS_TOKEN = os.environ.get("ACCESS_TOKEN")
+CONSUMER_KEY = os.environ.get("CONSUMER_KEY")
+CONSUMER_SECRET = os.environ.get("CONSUMER_SECRET")
 
 def config(filename: str = "config"):
     """ Fetch default config file """
@@ -27,8 +34,8 @@ def traceback_maker(err, advance: bool = True):
 def api():
 
     key = config()
-    auth = tweepy.OAuthHandler(key["consumer_key"], key["consumer_secret"])
-    auth.set_access_token(key["access_token"], key["access_secret"])
+    auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+    auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET)
     api = tweepy.API(auth, parser=tweepy.parsers.JSONParser())
     return api
 

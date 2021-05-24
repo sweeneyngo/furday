@@ -32,15 +32,15 @@ class Daily(commands.Cog):
         res = default.search()
         if res != None:
             res, img, profile, time = res
-        
+    
+            user = self.bot.get_user(self.config['id'])
+            embedColour = random.randint(0, self.config['white'])
+            # if hasattr(ctx, "guild") and ctx.guild is not None:
+            #     embedColour = ctx.me.top_role.colour
 
-        user = self.bot.get_user(self.config['id'])
-        embedColour = random.randint(0, self.config['white'])
-        # if hasattr(ctx, "guild") and ctx.guild is not None:
-        #     embedColour = ctx.me.top_role.colour
-
-        embed = default.send_embed(embedColour, user, res, img, profile, time)
-        await channel.send(embed=embed)
+            embed = default.send_embed(embedColour, user, res, img, profile, time)
+            await channel.send(embed=embed)
+        return
 
     # @tdaily.before_loop
     # async def before_tdaily():
@@ -71,10 +71,11 @@ class Daily(commands.Cog):
         if res != None:
             res, img, profile, time = res
         
-        embedColour = random.randint(0, self.config['white'])
+            embedColour = random.randint(0, self.config['white'])
 
-        embed = default.send_embed(embedColour, ctx.bot.user, res, img, profile, time)
-        await ctx.send(embed=embed)
+            embed = default.send_embed(embedColour, ctx.bot.user, res, img, profile, time)
+            await ctx.send(embed=embed)
+        return
 
 
 

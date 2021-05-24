@@ -96,6 +96,7 @@ def search():
             INSERT INTO store (tweet)
             VALUES (%s)''', (status['id'],))
 
+            conn.commit()
             # print current table
             print(query(cur, '''
             SELECT * FROM store'''))

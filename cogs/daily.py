@@ -67,7 +67,10 @@ class Daily(commands.Cog):
         """ Retrieve a daily furry. """
         await ctx.message.delete()
 
-        res = default.search()
+        guild = ctx.message.guild
+        channel = ctx.message.channel
+
+        res = default.search(guild, channel)
         if res != None:
             res, img, profile, time = res
         

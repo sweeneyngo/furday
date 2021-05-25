@@ -7,7 +7,7 @@ import timeago as timesince
 import tweepy
 import psycopg2
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv, find_dotenv
 
 from io import BytesIO
@@ -46,7 +46,7 @@ def api():
     api = tweepy.API(auth, parser=tweepy.parsers.JSONParser())
     return api
 
-def search():
+def search(guild, channel):
     _api = api()
     key = config()
 
@@ -58,9 +58,8 @@ def search():
                      
     cur = conn.cursor()
 
-    cur.execute('''
-    CREATE TABLE IF NOT EXISTS store (id SERIAL PRIMARY KEY,
-    tweet BIGINT NOT NULL UNIQUE)''')
+    initdb(cur)
+    setchannel(cur, guild, channel)
 
     tweets = _api.user_timeline(key['twitter_id'], count=5)
     
@@ -75,43 +74,128 @@ def search():
         res = query(cur, '''
         SELECT * FROM store
         WHERE EXISTS
-        (SELECT 1 FROM store WHERE tweet=%s)''', (status['id'],))
+        (SELECT 1 FROM store WHERE tweet_id=%s)''', (status['id'],))
         
-        print(f"Does it exist in DB? {res}")
+        if res:
+           doesExist = 'Yes.' 
+        else:
+            doesExist = 'No.'
 
-        # don't sift through older tweets
+        print(f"Does this tweet exist in store? {doesExist}")
+
+        # if it exists, don't sift through older tweets
         if res != None:
+            
+            # Task: Check channel DB if current ID is earlier than tweet ID
+            
+            # Get the tweet from the tweet_id of channel.
+            channel_q = query(cur, '''
+            SELECT created_date, created_at FROM store
+            WHERE tweet_id=
+            (SELECT tweet_id FROM channel WHERE channel_id=%s)''', (channel.id,))
+            # print("Channel:")
+            # print(channel_q, end='\n')
+
+            # Get the tweet from the tweet_id.
+            tweet_q = query(cur, '''
+            SELECT created_date, created_at FROM store WHERE tweet_id=%s
+            ''', (status['id'],))
+            
+            # print("Tweet:")
+            # print(tweet_q, end='\n')
+
+            #Subtract tweet_q[created_at] - channel_q[created_at]
+            diff = datetime.combine(tweet_q['created_date'], tweet_q['created_at']) - datetime.combine(channel_q['created_date'], channel_q['created_at'])
+            # print(f'Diff: {diff}')
+
+            # Tweet is new for channel, so add!
+            if diff > timedelta(hours=0, minutes=0, seconds=0):
+                match = checkDaily(cur, status, channel, True)
+
+                if not match:
+                    continue
+                else:
+                    return match
+
+            # If time is equal, or earlier than channel's current tweet, don't send anything.
+            print('Tweet already sent to channel! Cancelling. . .')
             break
+        
+        # If it doesn't exist, update and check
+        else:
+            match = checkDaily(cur, conn, status, channel)
+            if not match:
+                continue
+            else:
+                return match
 
-        if 'text' in status:
-            text = status['text']
 
-        # Response to tweet
-        if 'Suggested by' in text and 'in_reply_to_status_id' in status:
-            continue
+def updateTweet(cur, conn, status, channel, isMismatch):
 
-        # Original tweet
-        elif "Today's furry character" in text:
-            
-            # store id in DB
-            cur = conn.cursor()
-            
-            res = cur.execute('''
-            INSERT INTO store (tweet)
-            VALUES (%s)''', (status['id'],))
+    # if new tweet
+    if not isMismatch:
+        print('Dispersing tweet to channel to match the tweet stack. . .')
+        cur.execute('''
+        UPDATE channel SET tweet_id=%s
+        WHERE channel_id=%s''', (status['id'], channel.id))
 
-            conn.commit()
-            # print current table
-            print(query(cur, '''
-            SELECT * FROM store'''))
+    # if update tweet
+    else:
+        print('Updating channel to match the tweet stack. . .')
+        cur.execute('''
+        UPDATE channel SET tweet_id=
+        (SELECT tweet_id FROM store WHERE tweet_id=%s)
+        WHERE channel_id=%s''', (status['id'], channel.id))
 
-            cur.connection.close()
+    conn.commit()
 
-            return image(tweet)
+# check if the tweet is a "Daily" tweet.
+def checkDaily(cur, conn, status, channel, isMismatch=False):
+
+    if 'text' in status:
+        text = status['text']
+
+    # Response to tweet
+    if 'Suggested by' in text and 'in_reply_to_status_id' in status:
+        print('Unrelated tweet.', end='\n')
+        return None
+
+    # Original tweet
+    elif "Today's furry character" in text:
+        
+        print('Found tweet!', end='\n')
+        # store id in DB
+        cur = conn.cursor()
+        
+        created = datetime.strptime(status['created_at'], "%a %b %d %H:%M:%S %z %Y")
+        created_date = created.strftime('%Y-%m-%d')
+        created_at = created.strftime('%H:%M:%S')
+
+        res = cur.execute('''
+        INSERT INTO store (tweet_id, created_date, created_at)
+        VALUES (%s, %s, %s)''', (status['id'], created_date, created_at))
+
+        conn.commit()
+        
+
+        print('Current Store: ')
+        print(query(cur, '''
+        SELECT * FROM store'''))
+
+        # update channel->tweet_id
+        updateTweet(cur, conn, status, channel, isMismatch)
+
+
+        cur.connection.close()
+
+        return image(status)
+
+    print('Unrelated tweet.', end='\n')
 
 def image(src):
 
-    source = to_json(src)
+    source = src
+    # source = to_json(src)
     key = config()
     
     img = key['err_image']
@@ -154,3 +238,44 @@ def query(cur, query, args=()):
     cur.execute(query, args)
     r = [dict((cur.description[i][0], value) for i, value in enumerate(row)) for row in cur.fetchall()]
     return (r[0] if r else None)
+
+def initdb(cur):
+
+    cur.execute('''
+    CREATE TABLE IF NOT EXISTS server 
+    (id SERIAL PRIMARY KEY,
+    server_id BIGINT UNIQUE NOT NULL,
+    name VARCHAR ( 50 ) NOT NULL)''')
+    
+    cur.execute('''
+    CREATE TABLE IF NOT EXISTS channel 
+    (id SERIAL PRIMARY KEY,
+    channel_id BIGINT UNIQUE NOT NULL,
+    server_id BIGINT UNIQUE NOT NULL,
+    name VARCHAR ( 50 ) NOT NULL,
+    tweet_id BIGINT UNIQUE NOT NULL)''')
+    
+    cur.execute('''
+    CREATE TABLE IF NOT EXISTS store 
+    (id SERIAL PRIMARY KEY,
+    tweet_id BIGINT UNIQUE NOT NULL,
+    created_date DATE NOT NULL,
+    created_at TIME NOT NULL)''')
+
+def setchannel(cur, guild, channel):
+
+    dead = -1 # snt
+
+    # Add new server if not already there
+    cur.execute('''
+    INSERT INTO server (server_id, name)
+    VALUES (%s, %s)
+    ON CONFLICT (server_id)
+    DO NOTHING''', (guild.id, guild.name))
+
+    # Add new channel if not already there
+    cur.execute('''
+    INSERT INTO channel (channel_id, server_id, name, tweet_id)
+    VALUES (%s, %s, %s, %s)
+    ON CONFLICT (server_id)
+    DO NOTHING''', (channel.id, guild.id, channel.name, dead))

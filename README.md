@@ -8,7 +8,7 @@ furday manages + fetches daily character posts from ![@daily_furry](https://twit
 <sub>a daily furry!</sub>
 <sub>thank you @TommoTheCabbit</sub>
 
-<img align="right" height="112" width="112" src=https://pbs.twimg.com/profile_images/1377740950584328192/YOJr-Xph_400x400.png>
+<img align="right" src=https://i.imgur.com/v82L6A9.png>
 Requires discord.py + PSQL credentials for data handling and bot storage.
 For quick hosting + PSQL integration, I recommend using Heroku and using `psycopg2` for API requests. Alternatively, local hosting on pm2 (launch as a service) or deploying to Docker are other methods of hosting, but require manual installing of PSQL (dependent on machine).
 
